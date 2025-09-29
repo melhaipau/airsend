@@ -18,21 +18,23 @@ jobs:
         run: |
           git clone https://github.com/philippe44/libraop.git
           cd libraop
-          git submodule update --force --recursive --init --remote
+          git submodule update --init --recursive
 
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Build cliraop (Release x64)
+      - name: Configure with CMake (VS 2022 generator, x64)
         working-directory: libraop
-        run: msbuild libraop.sln /t:cliraop /p:Configuration=Release /p:Platform=x64
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 
-      - name: Locate raop_play.exe
+      - name: Build raop_play (Release)
+        working-directory: libraop
+        run: cmake --build build --config Release --target raop_play
+
+      - name: Find raop_play.exe
         id: findexe
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Path libraop -Recurse -Filter raop_play.exe | Select-Object -First 1
-          if (-not $exe) { throw "raop_play.exe not found after build." }
+          $exe = Get-ChildItem -Path libraop\build -Recurse -Filter raop_play.exe | Select-Object -First 1
+          if (-not $exe) { throw "raop_play.exe not found after CMake build." }
           "path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Upload artifact
