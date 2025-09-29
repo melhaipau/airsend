@@ -1,9 +1,7 @@
 name: Build raop_play (libraop)
-cat > .github/workflows/build-raop-play.yml <<'EOF'
-name: Build raop_play (libraop)
 
 on:
-  workflow_dispatch:    # lets you run it manually
+  workflow_dispatch: {}
   push:
     paths:
       - ".github/workflows/build-raop-play.yml"
@@ -13,7 +11,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout your repo (not strictly needed)
+      - name: Checkout (your repo)
         uses: actions/checkout@v4
 
       - name: Clone libraop (with submodules)
@@ -35,7 +33,7 @@ jobs:
         run: |
           $exe = Get-ChildItem -Path libraop -Recurse -Filter raop_play.exe | Select-Object -First 1
           if (-not $exe) { throw "raop_play.exe not found after build." }
-          echo "path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
