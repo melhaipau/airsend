@@ -1,0 +1,42 @@
+name: Build raop_play (libraop)
+
+on:
+  workflow_dispatch:    # lets you run it manually
+  push:
+    paths:
+      - ".github/workflows/build-raop-play.yml"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout your repo (not strictly needed)
+        uses: actions/checkout@v4
+
+      - name: Clone libraop (with submodules)
+        run: |
+          git clone https://github.com/philippe44/libraop.git
+          cd libraop
+          git submodule update --force --recursive --init --remote
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build cliraop (Release x64)
+        working-directory: libraop
+        run: msbuild libraop.sln /t:cliraop /p:Configuration=Release /p:Platform=x64
+
+      - name: Locate raop_play.exe
+        id: findexe
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path libraop -Recurse -Filter raop_play.exe | Select-Object -First 1
+          if (-not $exe) { throw "raop_play.exe not found after build." }
+          echo "path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: raop_play-win64
+          path: ${{ steps.findexe.outputs.path }}
