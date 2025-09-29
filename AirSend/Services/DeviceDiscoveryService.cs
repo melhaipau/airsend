@@ -1,4 +1,4 @@
-
+// File: AirSend/Services/DeviceDiscoveryService.cs
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Zeroconf;
 using AirSend.Models;
+using AirSend.Utils;
 
 namespace AirSend.Services
 {
@@ -18,6 +19,7 @@ namespace AirSend.Services
 
         public async Task StartAsync()
         {
+            _cts?.Cancel();
             _cts = new CancellationTokenSource();
 
             _ = Task.Run(async () =>
@@ -28,29 +30,39 @@ namespace AirSend.Services
                 {
                     try
                     {
-                        var results = await ZeroconfResolver.ResolveAsync(new string[] { "_airplay._tcp.local.", "_raop._tcp.local." }, scanTime: TimeSpan.FromSeconds(2));
+                        var results = await ZeroconfResolver.ResolveAsync(
+                            new[] { "_airplay._tcp.local.", "_raop._tcp.local." },
+                            scanTime: TimeSpan.FromSeconds(2)
+                        );
+
                         var current = new HashSet<string>();
 
-                        foreach (var r in results)
+                        foreach (var host in results)
                         {
-                            var ip = r.IPAddress;
-                            var name = r.DisplayName;
-                            foreach (var svc in r.Services)
+                            var ip = (host.IPAddresses != null && host.IPAddresses.Count > 0)
+                                ? host.IPAddresses[0]
+                                : host.IPAddress;
+
+                            var hostLabel = !string.IsNullOrWhiteSpace(host.DisplayName) ? host.DisplayName : ip;
+
+                            foreach (var svc in host.Services)
                             {
-                                var svcType = svc.Key; // _airplay._tcp or _raop._tcp
+                                var svcType = svc.Key;
                                 var port = svc.Value.Port;
-                                var id = $"{name}@{ip}:{port}/{svcType}";
+                                var id = $"{host.DisplayName}@{ip}:{port}/{svcType}";
+
                                 current.Add(id);
                                 if (!known.ContainsKey(id))
                                 {
                                     var dev = new DiscoveredDevice
                                     {
                                         Id = id,
-                                        Name = name,
-                                        Hostname = r.HostName,
+                                        Name = host.DisplayName,
+                                        Hostname = hostLabel,
                                         IP = ip,
                                         Port = port,
-                                        ServiceType = svcType
+                                        ServiceType = svcType,
+                                        IsOnline = true
                                     };
                                     known[id] = dev;
                                     DeviceFound?.Invoke(dev);
@@ -70,19 +82,27 @@ namespace AirSend.Services
                             known.Remove(k);
                         }
                     }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Discovery error: {ex.Message}");
+                        Log.Error($"Discovery error: {ex.Message}");
                     }
 
-                    await Task.Delay(5000, _cts.Token);
+                    try { await Task.Delay(5000, _cts.Token); }
+                    catch (OperationCanceledException) { break; }
                 }
             }, _cts.Token);
+
+            await Task.CompletedTask;
         }
 
         public void Stop()
         {
             _cts?.Cancel();
+            _cts = null;
         }
     }
 }

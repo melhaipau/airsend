@@ -1,0 +1,9 @@
+AirSend/bin/
+AirSend/obj/
+out/
+out-single/
+out-standalone/
+.vs/
+.vscode/
+.DS_Store
+Thumbs.db
