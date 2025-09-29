@@ -1,4 +1,4 @@
-name: Build raop_play (libraop)
+name: Build raop_play (libraop) [MSYS2]
 
 on:
   workflow_dispatch: {}
@@ -14,27 +14,44 @@ jobs:
       - name: Checkout (your repo)
         uses: actions/checkout@v4
 
+      - name: Setup MSYS2 (MinGW64)
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            base-devel
+            git
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-make
+            mingw-w64-x86_64-pkg-config
+            mingw-w64-x86_64-openssl
+
       - name: Clone libraop (with submodules)
+        shell: msys2 {0}
         run: |
           git clone https://github.com/philippe44/libraop.git
           cd libraop
           git submodule update --init --recursive
 
-      - name: Configure with CMake (VS 2022 generator, x64)
+      - name: Configure with CMake (MinGW Makefiles)
+        shell: msys2 {0}
         working-directory: libraop
         run: |
-          cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+          cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
 
       - name: Build raop_play (Release)
+        shell: msys2 {0}
         working-directory: libraop
-        run: cmake --build build --config Release --target raop_play
+        run: |
+          cmake --build build --config Release --target raop_play -j
 
       - name: Find raop_play.exe
         id: findexe
         shell: pwsh
         run: |
           $exe = Get-ChildItem -Path libraop\build -Recurse -Filter raop_play.exe | Select-Object -First 1
-          if (-not $exe) { throw "raop_play.exe not found after CMake build." }
+          if (-not $exe) { throw "raop_play.exe not found after MSYS2/MinGW build." }
           "path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Upload artifact
